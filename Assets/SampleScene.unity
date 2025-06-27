@@ -9254,6 +9254,15 @@ MonoBehaviour:
   speed: 8
   crouchSpeedDivisor: 3
   isCrouching: 0
+  isGround: 0
+  isJumping: 0
+  jumpForce: 6.3
+  jumpHoldForce: 1.9
+  jumpHoldDuration: 0.1
+  crouchJumpBoost: 2.5
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 64
 --- !u!1 &877777386
 GameObject:
   m_ObjectHideFlags: 0
@@ -9363,7 +9372,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 5
+  orthographic size: 19.540379
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
