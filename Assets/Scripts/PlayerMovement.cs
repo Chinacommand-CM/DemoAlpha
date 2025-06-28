@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class PlayerMovement : MonoBehaviour
 // 移动脚本
@@ -17,6 +18,8 @@ public class PlayerMovement : MonoBehaviour
     public bool isCrouching ;
     public bool isGround;
     public bool isJumping;
+    public bool isHeadBlocked;
+    public bool isHanging;
     
     // 这里是碰撞体尺寸
     private Vector2 Standsize;
@@ -31,10 +34,19 @@ public class PlayerMovement : MonoBehaviour
 
     private float jumpTime;
 
-    [Header("环境监测")] public LayerMask groundLayer;
+    [Header("环境监测")]
+    public LayerMask groundLayer;
     
     private bool jumpPress;       //跳跃
     private bool crouchHoldPress; //下蹲
+
+    public float footOffset = 0.4f;//脚偏移
+    public float headClearance = 0.5f;//头部 clearance
+    public float groundDistance = 0.2f ;//检测距离
+    private float eyeHeight    = 1.5f; //角色眼睛高度
+    private float grabDistance = 0.4f; //检测墙壁射线距离(侧面)
+    private float reachOffset  = 0.7f; //检测墙的射线距离(头顶)
+    public float hangingJumpForce = 15f;//挂起时跳跃力
     
     // 厘米君的第一个C#捏
     // 喵
@@ -62,9 +74,44 @@ public class PlayerMovement : MonoBehaviour
         Jump();
     }
 
+    RaycastHit2D raycastHit(Vector2 offset , Vector2 direction , float length , LayerMask  layer)
+    {
+        Vector2 position = transform.position;
+        Vector2 position2 = position + offset;//起点坐标
+        RaycastHit2D check = Physics2D.Raycast(position2, direction, length, layer);
+        Debug.DrawRay (position2, direction*length, Color.white,length);
+        return check;
+    }
+    
     void PhysicsCheck()
     {
-        isGround = bc .IsTouchingLayers(groundLayer);
+        RaycastHit2D leftcheck = raycastHit(new Vector2(-footOffset, 0f), Vector2.down, groundDistance, groundLayer);
+        RaycastHit2D rightcheck = raycastHit(new Vector2(footOffset, 0f), Vector2.down, groundDistance, groundLayer);
+        if (leftcheck && rightcheck)//also can use "isGround=leftcheck && rightcheck"
+        {
+            isGround=true;
+        }
+        else
+        {
+            isGround=false;
+        }
+        RaycastHit2D headcheck = raycastHit(new Vector2(0,Standsize.y), Vector2.up, headClearance, groundLayer);//检测头部
+        isHeadBlocked=headcheck;
+        float eyedirection = transform.localScale.x;
+        Vector2 direction = new Vector2(eyedirection, 0);
+        RaycastHit2D heightcheck = raycastHit(new Vector2(footOffset*eyedirection, Standsize.y), direction, grabDistance, groundLayer);
+        RaycastHit2D eyescheck = raycastHit(new Vector2(footOffset*eyedirection, eyeHeight), direction, grabDistance, groundLayer);
+        RaycastHit2D wallcheck = raycastHit(new Vector2(reachOffset*eyedirection, Standsize.y), Vector2.down, grabDistance, groundLayer);
+        //这里是检测角色是否在墙
+        if (!isGround && rb.velocity.y < 0 && wallcheck && eyescheck && !heightcheck)
+        {
+            isHanging = true;
+            rb.bodyType = RigidbodyType2D.Static;
+            Vector2 oneonefourfiveonefour = transform.position ;
+            oneonefourfiveonefour.x += (eyescheck.distance-0.05f)*eyedirection;
+            oneonefourfiveonefour.y -= wallcheck.distance;
+            transform.position = oneonefourfiveonefour;
+        }//挂起
     }
 
     void Jump()
@@ -95,6 +142,20 @@ public class PlayerMovement : MonoBehaviour
                 isJumping = false;
             }
         }
+        if (isHanging)
+        {
+            if (jumpPress)
+            {
+                rb.bodyType = RigidbodyType2D.Dynamic;
+                isHanging=false;
+                rb.AddForce(new Vector2(0, hangingJumpForce), ForceMode2D.Impulse);
+            }
+            if (crouchHoldPress)
+            {
+                rb.bodyType = RigidbodyType2D.Dynamic;
+                isHanging = false;
+            }
+        }
     }
     private void GroundMovement()
     // 移动逻辑
@@ -104,13 +165,13 @@ public class PlayerMovement : MonoBehaviour
             // 执行亲爱的下蹲捏
             Crouch();
         }
-        else if (isCrouching&& !crouchHoldPress)
+        else if (isCrouching&& !crouchHoldPress&& !isHeadBlocked)
 
         {
             // 贼也站起来了是吧
             Standup();
         }
-        else if (isCrouching&& !isGround)
+        else if (isCrouching&& !isGround&& !isHeadBlocked)
         { 
             Standup();
         }
